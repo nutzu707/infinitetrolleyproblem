@@ -113,13 +113,60 @@ function parseBatchResponse(text: string): TrolleyBatchItem[] {
   return objects;
 }
 
-const BATCH_SIZE = 5;
+// Set the batch size to 10 to cache 10 questions at a time
+const BATCH_SIZE = 10;
+
+// List of adjectives to diversify the prompt
+const ADJECTIVES = [
+  "funny",
+  "interesting",
+  "thought-provoking",
+  "absurd",
+  "challenging",
+  "philosophical",
+  "weird",
+  "creative",
+  "surprising",
+  "controversial"
+];
+
+function getRandomAdjectives(count: number) {
+  // Shuffle and pick 'count' adjectives
+  const shuffled = [...ADJECTIVES].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count);
+}
+
+// Typing animation hook
+function useTypewriter(text: string, speed: number, deps: any[] = []) {
+  const [displayed, setDisplayed] = useState('');
+  useEffect(() => {
+    setDisplayed('');
+    if (!text) return;
+    let i = 0;
+    let cancelled = false;
+    function tick() {
+      if (cancelled) return;
+      setDisplayed(text.slice(0, i + 1));
+      if (i < text.length - 1) {
+        i++;
+        setTimeout(tick, speed);
+      }
+    }
+    tick();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text, ...deps]);
+  return displayed;
+}
 
 export default function AskAI() {
   const [loading, setLoading] = useState(true);
   const [phase, setPhase] = useState<'question' | 'estimate'>('question');
   const [userChoice, setUserChoice] = useState<string | null>(null);
 
+  // Maintain a queue of questions to cache 10 at a time
   const [batch, setBatch] = useState<TrolleyBatchItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -127,6 +174,10 @@ export default function AskAI() {
 
   const fetchingBatch = useRef(false);
 
+  // For animation: track when question is fully shown
+  const [questionDone, setQuestionDone] = useState(false);
+
+  // Fetch a batch of 10 questions and append to the queue
   const fetchBatch = async () => {
     if (fetchingBatch.current) return;
     fetchingBatch.current = true;
@@ -134,9 +185,13 @@ export default function AskAI() {
     setError(null);
     setUserChoice(null);
     setPhase('question');
+    setQuestionDone(false);
+
+    // Pick 3 random adjectives for each request
+    const adjectives = getRandomAdjectives(3).join(", ");
 
     const batchPrompt = `
-Create ${BATCH_SIZE} funny trolley problems, each in exactly two sentences: one starting with 'If nothing is done,' and one with 'If the lever is pulled.' Each should be under 40 words total. For each, estimate the percentage of people who would agree with "Press the lever" and "Do nothing" (just a number and a % for each, no explanation). Respond as a JSON array of objects, each with "question" and "estimates" fields, where "estimates" is an object with keys "Press the lever" and "Do nothing". Example:
+Create ${BATCH_SIZE} ${adjectives} trolley problems, each in exactly two sentences: one starting with 'If nothing is done,' and one with 'If the lever is pulled.' Each should be under 40 words total. For each, estimate the percentage of people who would agree with "Press the lever" and "Do nothing" (just a number and a % for each, no explanation). Respond as a JSON array of objects, each with "question" and "estimates" fields, where "estimates" is an object with keys "Press the lever" and "Do nothing". Example:
 [
   {
     "question": "If nothing is done, ... If the lever is pulled, ...",
@@ -160,8 +215,6 @@ No extra commentary.
 
       if (!res.ok) {
         setError("Failed to fetch trolley problems.");
-        setBatch([]);
-        setCurrentIndex(0);
         setLoading(false);
         fetchingBatch.current = false;
         return;
@@ -178,43 +231,81 @@ No extra commentary.
         parsed = parseBatchResponse((data as { answer: string }).answer);
       }
       if (Array.isArray(parsed) && parsed.length > 0) {
-        setBatch(parsed);
-        setCurrentIndex(0);
+        setBatch(prev => {
+          // If we already have some questions left, append new ones
+          // Remove already used questions (currentIndex) before appending
+          const remaining = prev.slice(currentIndex);
+          setCurrentIndex(0);
+          return [...remaining, ...parsed];
+        });
       } else {
         setError("Could not parse trolley problems. Please try again.");
-        setBatch([]);
-        setCurrentIndex(0);
       }
     } catch {
       setError("Error fetching trolley problems.");
-      setBatch([]);
-      setCurrentIndex(0);
     } finally {
       setLoading(false);
       fetchingBatch.current = false;
     }
   };
 
+  // On mount, fetch the first batch
   useEffect(() => {
     fetchBatch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const current = batch[currentIndex] || null;
+
+  // Typing animation for question
+  const typewriterSpeed = 18; // ms per character
+  const displayedQuestion = useTypewriter(
+    current && phase === 'question' ? current.question : '',
+    typewriterSpeed,
+    [currentIndex, phase]
+  );
+
+  // When question changes, reset questionDone
+  useEffect(() => {
+    setQuestionDone(false);
+  }, [currentIndex, phase]);
+
+  // When typing animation finishes, set questionDone
+  useEffect(() => {
+    if (
+      current &&
+      phase === 'question' &&
+      displayedQuestion.length === current.question.length
+    ) {
+      setQuestionDone(true);
+    }
+  }, [displayedQuestion, current, phase]);
 
   const handleChoice = (choice: string) => {
     setUserChoice(choice);
     setPhase('estimate');
+    // questionDone remains true so question stays visible
   };
 
   const handleNext = () => {
     setUserChoice(null);
     setPhase('question');
+    setQuestionDone(false);
+    // If we are at the last question in the current batch, fetch more
     if (currentIndex + 1 < batch.length) {
       setCurrentIndex(currentIndex + 1);
+      // If we are about to run out (e.g., only 2 left), prefetch next batch
+      if (batch.length - (currentIndex + 2) < 2 && !fetchingBatch.current) {
+        fetchBatch();
+      }
     } else {
+      // If no more questions, fetch a new batch and reset
       fetchBatch();
     }
   };
 
-  if (loading) {
+  // If loading and no questions, show loading
+  if (loading && batch.length === 0) {
     return (
       <div className="flex justify-center items-center text-3xl">
         <div>Generating more trolley problems...</div>
@@ -238,8 +329,6 @@ No extra commentary.
     );
   }
 
-  const current = batch[currentIndex] || null;
-
   if (!current) {
     return (
       <div className="flex justify-center items-center text-3xl">
@@ -248,29 +337,69 @@ No extra commentary.
     );
   }
 
+  // Always show the question (with animation if in question phase, full text if in estimate phase)
+  const showFullQuestion = phase === 'estimate' && current ? current.question : displayedQuestion;
+  const showCursor =
+    phase === 'question' &&
+    displayedQuestion.length < (current.question?.length || 0);
+
   return (
     <div className="flex justify-center items-center text-3xl">
       <div className="mb-6 w-full">
         <div>
-          <div className="p-4 rounded mb-4">
-            <p>{current.question}</p>
+          <div className="p-4 rounded mb-4 min-h-[3.5em]">
+            <p
+              style={{
+                fontFamily: 'inherit',
+                whiteSpace: 'pre-line',
+                minHeight: '2.5em',
+                letterSpacing: '0.01em',
+                transition: 'color 0.2s',
+                color: showCursor ? '#888' : undefined
+              }}
+              aria-label={current.question}
+            >
+              {showFullQuestion}
+              <span
+                style={{
+                  display: showCursor ? 'inline-block' : 'none',
+                  width: '0.6ch',
+                  background: 'currentColor',
+                  opacity: 0.5,
+                  animation: 'blink 1s steps(1) infinite'
+                }}
+              >
+                &nbsp;
+              </span>
+            </p>
+            <style>{`
+              @keyframes blink {
+                0% { opacity: 0.5; }
+                50% { opacity: 0; }
+                100% { opacity: 0.5; }
+              }
+            `}</style>
           </div>
           {!userChoice && (
             <div className="flex gap-4 justify-center mb-6">
-              <button
-                className="border-2 p-2 rounded-md hover:bg-black hover:text-white cursor-pointer"
-                onClick={() => handleChoice('Do nothing')}
-                disabled={!!userChoice}
-              >
-                Do nothing
-              </button>
-              <button
-                className="border-2 p-2 rounded-md hover:bg-black hover:text-white cursor-pointer"
-                onClick={() => handleChoice('Press the lever')}
-                disabled={!!userChoice}
-              >
-                Press the lever
-              </button>
+              {questionDone && (
+                <>
+                  <button
+                    className="border-2 p-2 rounded-md hover:bg-black hover:text-white cursor-pointer"
+                    onClick={() => handleChoice('Do nothing')}
+                    disabled={!!userChoice}
+                  >
+                    Do nothing
+                  </button>
+                  <button
+                    className="border-2 p-2 rounded-md hover:bg-black hover:text-white cursor-pointer"
+                    onClick={() => handleChoice('Press the lever')}
+                    disabled={!!userChoice}
+                  >
+                    Press the lever
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>

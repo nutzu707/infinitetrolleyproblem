@@ -136,7 +136,7 @@ export default function AskAI() {
     setPhase('question');
 
     const batchPrompt = `
-Create ${BATCH_SIZE} absurd trolley problems, each in exactly two sentences: one starting with 'If nothing is done,' and one with 'If the lever is pulled.' Each should be under 40 words total. For each, estimate the percentage of people who would agree with "Press the lever" and "Do nothing" (just a number and a % for each, no explanation). Respond as a JSON array of objects, each with "question" and "estimates" fields, where "estimates" is an object with keys "Press the lever" and "Do nothing". Example:
+Create ${BATCH_SIZE} funny trolley problems, each in exactly two sentences: one starting with 'If nothing is done,' and one with 'If the lever is pulled.' Each should be under 40 words total. For each, estimate the percentage of people who would agree with "Press the lever" and "Do nothing" (just a number and a % for each, no explanation). Respond as a JSON array of objects, each with "question" and "estimates" fields, where "estimates" is an object with keys "Press the lever" and "Do nothing". Example:
 [
   {
     "question": "If nothing is done, ... If the lever is pulled, ...",
@@ -259,17 +259,17 @@ No extra commentary.
             <div className="flex gap-4 justify-center mb-6">
               <button
                 className="border-2 p-2 rounded-md hover:bg-black hover:text-white cursor-pointer"
-                onClick={() => handleChoice('Press the lever')}
-                disabled={!!userChoice}
-              >
-                Press the lever
-              </button>
-              <button
-                className="border-2 p-2 rounded-md hover:bg-black hover:text-white cursor-pointer"
                 onClick={() => handleChoice('Do nothing')}
                 disabled={!!userChoice}
               >
                 Do nothing
+              </button>
+              <button
+                className="border-2 p-2 rounded-md hover:bg-black hover:text-white cursor-pointer"
+                onClick={() => handleChoice('Press the lever')}
+                disabled={!!userChoice}
+              >
+                Press the lever
               </button>
             </div>
           )}

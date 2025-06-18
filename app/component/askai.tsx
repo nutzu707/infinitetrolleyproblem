@@ -33,9 +33,7 @@ function parseBatchResponse(text: string): TrolleyBatchItem[] {
     ) {
       return arr as TrolleyBatchItem[];
     }
-  } catch {
-    // Intentionally empty to suppress unused variable warning
-  }
+  } catch {}
 
   const objects: TrolleyBatchItem[] = [];
   try {
@@ -60,9 +58,7 @@ function parseBatchResponse(text: string): TrolleyBatchItem[] {
         if (objects.length > 0) return objects;
       }
     }
-  } catch {
-    // Intentionally empty to suppress unused variable warning
-  }
+  } catch {}
 
   const regex = /{[\s\S]*?}/g;
   const matches = text.match(regex);
@@ -81,9 +77,7 @@ function parseBatchResponse(text: string): TrolleyBatchItem[] {
         ) {
           objects.push(obj as TrolleyBatchItem);
         }
-      } catch {
-        // Intentionally empty to suppress unused variable warning
-      }
+      } catch {}
     }
     if (objects.length > 0) return objects;
   }
@@ -113,10 +107,8 @@ function parseBatchResponse(text: string): TrolleyBatchItem[] {
   return objects;
 }
 
-// Set the batch size to 10 to cache 10 questions at a time
 const BATCH_SIZE = 10;
 
-// List of adjectives to diversify the prompt
 const ADJECTIVES = [
   "funny",
   "interesting",
@@ -131,12 +123,10 @@ const ADJECTIVES = [
 ];
 
 function getRandomAdjectives(count: number) {
-  // Shuffle and pick 'count' adjectives
   const shuffled = [...ADJECTIVES].sort(() => Math.random() - 0.5);
   return shuffled.slice(0, count);
 }
 
-// Typing animation hook
 function useTypewriter(text: string, speed: number, deps: unknown[] = []) {
   const [displayed, setDisplayed] = useState('');
   useEffect(() => {
@@ -156,7 +146,6 @@ function useTypewriter(text: string, speed: number, deps: unknown[] = []) {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text, ...deps]);
   return displayed;
 }
@@ -166,7 +155,6 @@ export default function AskAI() {
   const [phase, setPhase] = useState<'question' | 'estimate'>('question');
   const [userChoice, setUserChoice] = useState<string | null>(null);
 
-  // Maintain a queue of questions to cache 10 at a time
   const [batch, setBatch] = useState<TrolleyBatchItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -174,16 +162,12 @@ export default function AskAI() {
 
   const fetchingBatch = useRef(false);
 
-  // For animation: track when question is fully shown
   const [questionDone, setQuestionDone] = useState(false);
 
-  // Track adjectives used for the current batch
   const [currentAdjectives, setCurrentAdjectives] = useState<string[]>([]);
 
-  // For image hover/selection state
   const [hoveredButton, setHoveredButton] = useState<null | 'Do nothing' | 'Press the lever'>(null);
 
-  // Fetch a batch of 10 questions and append to the queue
   const fetchBatch = async () => {
     if (fetchingBatch.current) return;
     fetchingBatch.current = true;
@@ -193,7 +177,6 @@ export default function AskAI() {
     setPhase('question');
     setQuestionDone(false);
 
-    // Pick 3 random adjectives for each request
     const adjectivesArr = getRandomAdjectives(3);
     setCurrentAdjectives(adjectivesArr);
     const adjectives = adjectivesArr.join(", ");
@@ -240,8 +223,6 @@ No extra commentary.
       }
       if (Array.isArray(parsed) && parsed.length > 0) {
         setBatch(prev => {
-          // If we already have some questions left, append new ones
-          // Remove already used questions (currentIndex) before appending
           const remaining = prev.slice(currentIndex);
           setCurrentIndex(0);
           return [...remaining, ...parsed];
@@ -257,28 +238,23 @@ No extra commentary.
     }
   };
 
-  // On mount, fetch the first batch
   useEffect(() => {
     fetchBatch();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const current = batch[currentIndex] || null;
 
-  // Typing animation for question
-  const typewriterSpeed = 18; // ms per character
+  const typewriterSpeed = 18;
   const displayedQuestion = useTypewriter(
     current && phase === 'question' ? current.question : '',
     typewriterSpeed,
     [currentIndex, phase]
   );
 
-  // When question changes, reset questionDone
   useEffect(() => {
     setQuestionDone(false);
   }, [currentIndex, phase]);
 
-  // When typing animation finishes, set questionDone
   useEffect(() => {
     if (
       current &&
@@ -292,8 +268,7 @@ No extra commentary.
   const handleChoice = (choice: string) => {
     setUserChoice(choice);
     setPhase('estimate');
-    setHoveredButton(null); // Remove hover state on selection
-    // questionDone remains true so question stays visible
+    setHoveredButton(null);
   };
 
   const handleNext = () => {
@@ -301,20 +276,16 @@ No extra commentary.
     setPhase('question');
     setQuestionDone(false);
     setHoveredButton(null);
-    // If we are at the last question in the current batch, fetch more
     if (currentIndex + 1 < batch.length) {
       setCurrentIndex(currentIndex + 1);
-      // If we are about to run out (e.g., only 2 left), prefetch next batch
       if (batch.length - (currentIndex + 2) < 2 && !fetchingBatch.current) {
         fetchBatch();
       }
     } else {
-      // If no more questions, fetch a new batch and reset
       fetchBatch();
     }
   };
 
-  // Determine which image to show based on hover and selection
   let railsImg = "/rails.png";
   if (phase === "question" && !userChoice) {
     if (hoveredButton === "Press the lever") {
@@ -330,7 +301,6 @@ No extra commentary.
     }
   }
 
-  // Always show the question (with animation if in question phase, full text if in estimate phase)
   const showFullQuestion = phase === 'estimate' && current ? current.question : displayedQuestion;
   const showCursor =
     phase === 'question' &&
@@ -338,7 +308,6 @@ No extra commentary.
 
   return (
     <div className="flex justify-center items-center text-3xl flex-col">
-      {/* Always show the image, even if loading or error */}
       <img src={railsImg} alt="Rails" className="w-full h-full select-none"/>
       <div className="mb-6 w-full">
         <div className="mb-2 text-base text-gray-500 items-center gap-2 hidden">
@@ -356,7 +325,6 @@ No extra commentary.
             <span>Loading...</span>
           )}
         </div>
-        {/* Loading state */}
         {loading && batch.length === 0 ? (
           <div className="flex justify-center items-center text-3xl">
             <div>Generating more trolley problems...</div>

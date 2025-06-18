@@ -17,14 +17,21 @@ type TrolleyBatchItem = {
 
 function parseBatchResponse(text: string): TrolleyBatchItem[] {
   try {
-    const arr = JSON.parse(text);
-    if (Array.isArray(arr) && arr.every(item =>
-      typeof item.question === "string" &&
-      typeof item.estimates === "object" &&
-      typeof item.estimates["Press the lever"] === "string" &&
-      typeof item.estimates["Do nothing"] === "string"
-    )) {
-      return arr;
+    const arr: unknown = JSON.parse(text);
+    if (
+      Array.isArray(arr) &&
+      arr.every(
+        (item: unknown) =>
+          typeof item === "object" &&
+          item !== null &&
+          typeof (item as { question: unknown }).question === "string" &&
+          typeof (item as { estimates: unknown }).estimates === "object" &&
+          (item as { estimates: { "Press the lever": unknown } }).estimates !== null &&
+          typeof (item as { estimates: { "Press the lever": unknown } }).estimates["Press the lever"] === "string" &&
+          typeof (item as { estimates: { "Do nothing": unknown } }).estimates["Do nothing"] === "string"
+      )
+    ) {
+      return arr as TrolleyBatchItem[];
     }
   } catch {
     // Intentionally empty to suppress unused variable warning
@@ -35,16 +42,19 @@ function parseBatchResponse(text: string): TrolleyBatchItem[] {
     const arrMatch = text.match(/\[([\s\S]*?)\]/);
     if (arrMatch) {
       const arrText = arrMatch[0];
-      const arr = JSON.parse(arrText.replace(/,\s*]/g, "]"));
+      const arr: unknown = JSON.parse(arrText.replace(/,\s*]/g, "]"));
       if (Array.isArray(arr)) {
         for (const obj of arr) {
           if (
-            typeof obj.question === "string" &&
-            typeof obj.estimates === "object" &&
-            typeof obj.estimates["Press the lever"] === "string" &&
-            typeof obj.estimates["Do nothing"] === "string"
+            typeof obj === "object" &&
+            obj !== null &&
+            typeof (obj as { question: unknown }).question === "string" &&
+            typeof (obj as { estimates: unknown }).estimates === "object" &&
+            (obj as { estimates: { "Press the lever": unknown } }).estimates !== null &&
+            typeof (obj as { estimates: { "Press the lever": unknown } }).estimates["Press the lever"] === "string" &&
+            typeof (obj as { estimates: { "Do nothing": unknown } }).estimates["Do nothing"] === "string"
           ) {
-            objects.push(obj);
+            objects.push(obj as TrolleyBatchItem);
           }
         }
         if (objects.length > 0) return objects;
@@ -59,14 +69,17 @@ function parseBatchResponse(text: string): TrolleyBatchItem[] {
   if (matches) {
     for (const m of matches) {
       try {
-        const obj = JSON.parse(m);
+        const obj: unknown = JSON.parse(m);
         if (
-          typeof obj.question === "string" &&
-          typeof obj.estimates === "object" &&
-          typeof obj.estimates["Press the lever"] === "string" &&
-          typeof obj.estimates["Do nothing"] === "string"
+          typeof obj === "object" &&
+          obj !== null &&
+          typeof (obj as { question: unknown }).question === "string" &&
+          typeof (obj as { estimates: unknown }).estimates === "object" &&
+          (obj as { estimates: { "Press the lever": unknown } }).estimates !== null &&
+          typeof (obj as { estimates: { "Press the lever": unknown } }).estimates["Press the lever"] === "string" &&
+          typeof (obj as { estimates: { "Do nothing": unknown } }).estimates["Do nothing"] === "string"
         ) {
-          objects.push(obj);
+          objects.push(obj as TrolleyBatchItem);
         }
       } catch {
         // Intentionally empty to suppress unused variable warning
@@ -80,7 +93,7 @@ function parseBatchResponse(text: string): TrolleyBatchItem[] {
   while (i < lines.length) {
     if (lines[i].toLowerCase().startsWith("question:")) {
       const question = lines[i].slice(9).trim();
-      let estimates: { "Press the lever"?: string; "Do nothing"?: string } = {};
+      const estimates: { "Press the lever"?: string; "Do nothing"?: string } = {};
       i++;
       while (i < lines.length && lines[i].toLowerCase().startsWith("estimates:")) {
         const estLine = lines[i].slice(10).trim();
@@ -154,10 +167,15 @@ No extra commentary.
         return;
       }
 
-      const data = await res.json();
+      const data: unknown = await res.json();
       let parsed: TrolleyBatchItem[] = [];
-      if (typeof data.answer === 'string') {
-        parsed = parseBatchResponse(data.answer);
+      if (
+        typeof data === "object" &&
+        data !== null &&
+        "answer" in data &&
+        typeof (data as { answer: unknown }).answer === "string"
+      ) {
+        parsed = parseBatchResponse((data as { answer: string }).answer);
       }
       if (Array.isArray(parsed) && parsed.length > 0) {
         setBatch(parsed);

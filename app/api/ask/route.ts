@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     const text = response.text();
 
     return NextResponse.json({ answer: text });
-  } catch (err: any) {
+  } catch (err) {
     console.error('Gemini error:', err);
     return NextResponse.json({ error: 'Failed to get a response from Gemini.' }, { status: 500 });
   }

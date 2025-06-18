@@ -177,6 +177,12 @@ export default function AskAI() {
   // For animation: track when question is fully shown
   const [questionDone, setQuestionDone] = useState(false);
 
+  // Track adjectives used for the current batch
+  const [currentAdjectives, setCurrentAdjectives] = useState<string[]>([]);
+
+  // For image hover/selection state
+  const [hoveredButton, setHoveredButton] = useState<null | 'Do nothing' | 'Press the lever'>(null);
+
   // Fetch a batch of 10 questions and append to the queue
   const fetchBatch = async () => {
     if (fetchingBatch.current) return;
@@ -188,7 +194,9 @@ export default function AskAI() {
     setQuestionDone(false);
 
     // Pick 3 random adjectives for each request
-    const adjectives = getRandomAdjectives(3).join(", ");
+    const adjectivesArr = getRandomAdjectives(3);
+    setCurrentAdjectives(adjectivesArr);
+    const adjectives = adjectivesArr.join(", ");
 
     const batchPrompt = `
 Create ${BATCH_SIZE} ${adjectives} trolley problems, each in exactly two sentences: one starting with 'If nothing is done,' and one with 'If the lever is pulled.' Each should be under 40 words total. For each, estimate the percentage of people who would agree with "Press the lever" and "Do nothing" (just a number and a % for each, no explanation). Respond as a JSON array of objects, each with "question" and "estimates" fields, where "estimates" is an object with keys "Press the lever" and "Do nothing". Example:
@@ -284,6 +292,7 @@ No extra commentary.
   const handleChoice = (choice: string) => {
     setUserChoice(choice);
     setPhase('estimate');
+    setHoveredButton(null); // Remove hover state on selection
     // questionDone remains true so question stays visible
   };
 
@@ -291,6 +300,7 @@ No extra commentary.
     setUserChoice(null);
     setPhase('question');
     setQuestionDone(false);
+    setHoveredButton(null);
     // If we are at the last question in the current batch, fetch more
     if (currentIndex + 1 < batch.length) {
       setCurrentIndex(currentIndex + 1);
@@ -304,133 +314,160 @@ No extra commentary.
     }
   };
 
-  // If loading and no questions, show loading
-  if (loading && batch.length === 0) {
-    return (
-      <div className="flex justify-center items-center text-3xl">
-        <div>Generating more trolley problems...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex justify-center items-center text-3xl">
-        <div>
-          <div className="text-red-600 mb-4">{error}</div>
-          <button
-            className="border-2 p-2 rounded-md hover:bg-black hover:text-white cursor-pointer"
-            onClick={fetchBatch}
-          >
-            Try Again
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!current) {
-    return (
-      <div className="flex justify-center items-center text-3xl">
-        <div>No trolley problems available.</div>
-      </div>
-    );
+  // Determine which image to show based on hover and selection
+  let railsImg = "/rails.png";
+  if (phase === "question" && !userChoice) {
+    if (hoveredButton === "Press the lever") {
+      railsImg = "/rails_pressed.png";
+    } else if (hoveredButton === "Do nothing") {
+      railsImg = "/rails_nothing.png";
+    }
+  } else if (phase === "estimate" && userChoice) {
+    if (userChoice === "Press the lever") {
+      railsImg = "/rails_pressed.png";
+    } else if (userChoice === "Do nothing") {
+      railsImg = "/rails_nothing.png";
+    }
   }
 
   // Always show the question (with animation if in question phase, full text if in estimate phase)
   const showFullQuestion = phase === 'estimate' && current ? current.question : displayedQuestion;
   const showCursor =
     phase === 'question' &&
-    displayedQuestion.length < (current.question?.length || 0);
+    displayedQuestion.length < (current?.question?.length || 0);
 
   return (
-    <div className="flex justify-center items-center text-3xl">
+    <div className="flex justify-center items-center text-3xl flex-col">
+      {/* Always show the image, even if loading or error */}
+      <img src={railsImg} alt="Rails" className="w-full h-full select-none"/>
       <div className="mb-6 w-full">
-        <div>
-          <div className="p-4 rounded mb-4 min-h-[3.5em]">
-            <p
-              style={{
-                fontFamily: 'inherit',
-                whiteSpace: 'pre-line',
-                minHeight: '2.5em',
-                letterSpacing: '0.01em',
-                transition: 'color 0.2s',
-                color: showCursor ? '#888' : undefined
-              }}
-              aria-label={current.question}
-            >
-              {showFullQuestion}
-              <span
-                style={{
-                  display: showCursor ? 'inline-block' : 'none',
-                  width: '0.6ch',
-                  background: 'currentColor',
-                  opacity: 0.5,
-                  animation: 'blink 1s steps(1) infinite'
-                }}
-              >
-                &nbsp;
-              </span>
-            </p>
-            <style>{`
-              @keyframes blink {
-                0% { opacity: 0.5; }
-                50% { opacity: 0; }
-                100% { opacity: 0.5; }
-              }
-            `}</style>
-          </div>
-          {!userChoice && (
-            <div className="flex gap-4 justify-center mb-6">
-              {questionDone && (
-                <>
-                  <button
-                    className="border-2 p-2 rounded-md hover:bg-black hover:text-white cursor-pointer"
-                    onClick={() => handleChoice('Do nothing')}
-                    disabled={!!userChoice}
-                  >
-                    Do nothing
-                  </button>
-                  <button
-                    className="border-2 p-2 rounded-md hover:bg-black hover:text-white cursor-pointer"
-                    onClick={() => handleChoice('Press the lever')}
-                    disabled={!!userChoice}
-                  >
-                    Press the lever
-                  </button>
-                </>
-              )}
-            </div>
+        <div className="mb-2 text-base text-gray-500 items-center gap-2 hidden">
+          <span className="font-semibold">Adjectives for this batch:</span>
+          {currentAdjectives.length > 0 ? (
+            <span>
+              {currentAdjectives.map((adj, idx) => (
+                <span key={adj}>
+                  {adj}
+                  {idx < currentAdjectives.length - 1 ? ', ' : ''}
+                </span>
+              ))}
+            </span>
+          ) : (
+            <span>Loading...</span>
           )}
         </div>
-        {phase === 'estimate' && userChoice && (
-          <div className='absolute bottom-0 w-[60%] mx-auto flex justify-center border-t-2 p-8 gap-16 items-center'>
-            <div className="">
-              <div>
-                {(() => {
-                  const estimate = current.estimates[userChoice as "Press the lever" | "Do nothing"];
-                  const percent = extractPercent(estimate);
-                  if (percent !== null) {
-                    const disagree = 100 - percent;
-                    return (
-                      <div className="text-2xl my-2">
-                        AI says <span className="bg-green-200 text-green-900 px-2 py-1 rounded">{percent}% of people agree with you</span> ,while <span className="bg-red-200 text-red-900 px-2 py-1 rounded">{disagree}% disagree</span>
-                      </div>
-                    );
-                  } else {
-                    return (
-                      <div className="text-2xl font-extrabold my-2">{estimate}</div>
-                    );
-                  }
-                })()}
-              </div>
+        {/* Loading state */}
+        {loading && batch.length === 0 ? (
+          <div className="flex justify-center items-center text-3xl">
+            <div>Generating more trolley problems...</div>
+          </div>
+        ) : error ? (
+          <div className="flex justify-center items-center text-3xl">
+            <div>
+              <div className="text-red-600 mb-4">{error}</div>
+              <button
+                className="border-2 p-2 rounded-md hover:bg-black hover:text-white cursor-pointer"
+                onClick={fetchBatch}
+              >
+                Try Again
+              </button>
             </div>
-            <button
-              className="border-2 p-2 rounded-md hover:bg-black hover:text-white cursor-pointer"
-              onClick={handleNext}
-            >
-              Next Question
-            </button>
+          </div>
+        ) : !current ? (
+          <div className="flex justify-center items-center text-3xl">
+            <div>No trolley problems available.</div>
+          </div>
+        ) : (
+          <div>
+            <div className="p-4 rounded mb-4 min-h-[3.5em]">
+              <p
+                style={{
+                  fontFamily: 'inherit',
+                  whiteSpace: 'pre-line',
+                  minHeight: '2.5em',
+                  letterSpacing: '0.01em',
+                  transition: 'color 0.2s',
+                  color: showCursor ? '#888' : undefined
+                }}
+                aria-label={current.question}
+              >
+                {showFullQuestion}
+                <span
+                  style={{
+                    display: showCursor ? 'inline-block' : 'none',
+                    width: '0.6ch',
+                    background: 'currentColor',
+                    opacity: 0.5,
+                    animation: 'blink 1s steps(1) infinite'
+                  }}
+                >
+                  &nbsp;
+                </span>
+              </p>
+              <style>{`
+                @keyframes blink {
+                  0% { opacity: 0.5; }
+                  50% { opacity: 0; }
+                  100% { opacity: 0.5; }
+                }
+              `}</style>
+            </div>
+            {!userChoice && (
+              <div className="flex gap-4 justify-center mb-6">
+                {questionDone && (
+                  <>
+                    <button
+                      className="border-2 p-2 rounded-md hover:bg-black hover:text-white cursor-pointer"
+                      onClick={() => handleChoice('Do nothing')}
+                      disabled={!!userChoice}
+                      onMouseEnter={() => setHoveredButton('Do nothing')}
+                      onMouseLeave={() => setHoveredButton(null)}
+                    >
+                      Do nothing
+                    </button>
+                    <button
+                      className="border-2 p-2 rounded-md hover:bg-black hover:text-white cursor-pointer"
+                      onClick={() => handleChoice('Press the lever')}
+                      disabled={!!userChoice}
+                      onMouseEnter={() => setHoveredButton('Press the lever')}
+                      onMouseLeave={() => setHoveredButton(null)}
+                    >
+                      Press the lever
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+            {phase === 'estimate' && userChoice && (
+              <div className='absolute bottom-0 w-[60%] mx-auto flex justify-center border-t-2 p-8 gap-16 items-center'>
+                <div className="">
+                  <div>
+                    {(() => {
+                      const estimate = current.estimates[userChoice as "Press the lever" | "Do nothing"];
+                      const percent = extractPercent(estimate);
+                      if (percent !== null) {
+                        const disagree = 100 - percent;
+                        return (
+                          <div className="text-2xl my-2">
+                            AI says <span className="bg-green-200 text-green-900 px-2 py-1 rounded">{percent}% of people agree with you</span> ,while <span className="bg-red-200 text-red-900 px-2 py-1 rounded">{disagree}% disagree</span>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div className="text-2xl font-extrabold my-2">{estimate}</div>
+                        );
+                      }
+                    })()}
+                  </div>
+                </div>
+                <button
+                  className="border-2 p-2 rounded-md hover:bg-black hover:text-white cursor-pointer"
+                  onClick={handleNext}
+                >
+                  Next Question
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

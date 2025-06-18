@@ -26,7 +26,8 @@ function parseBatchResponse(text: string): TrolleyBatchItem[] {
     )) {
       return arr;
     }
-  } catch (e) {
+  } catch {
+    // Intentionally empty to suppress unused variable warning
   }
 
   const objects: TrolleyBatchItem[] = [];
@@ -49,7 +50,9 @@ function parseBatchResponse(text: string): TrolleyBatchItem[] {
         if (objects.length > 0) return objects;
       }
     }
-  } catch (e) {}
+  } catch {
+    // Intentionally empty to suppress unused variable warning
+  }
 
   const regex = /{[\s\S]*?}/g;
   const matches = text.match(regex);
@@ -65,7 +68,9 @@ function parseBatchResponse(text: string): TrolleyBatchItem[] {
         ) {
           objects.push(obj);
         }
-      } catch (e) {}
+      } catch {
+        // Intentionally empty to suppress unused variable warning
+      }
     }
     if (objects.length > 0) return objects;
   }
@@ -75,7 +80,7 @@ function parseBatchResponse(text: string): TrolleyBatchItem[] {
   while (i < lines.length) {
     if (lines[i].toLowerCase().startsWith("question:")) {
       const question = lines[i].slice(9).trim();
-      let estimates: any = {};
+      let estimates: { "Press the lever"?: string; "Do nothing"?: string } = {};
       i++;
       while (i < lines.length && lines[i].toLowerCase().startsWith("estimates:")) {
         const estLine = lines[i].slice(10).trim();
@@ -86,7 +91,7 @@ function parseBatchResponse(text: string): TrolleyBatchItem[] {
         i++;
       }
       if (question && estimates["Press the lever"] && estimates["Do nothing"]) {
-        objects.push({ question, estimates });
+        objects.push({ question, estimates: { "Press the lever": estimates["Press the lever"]!, "Do nothing": estimates["Do nothing"]! } });
       }
     } else {
       i++;
@@ -162,7 +167,7 @@ No extra commentary.
         setBatch([]);
         setCurrentIndex(0);
       }
-    } catch (e) {
+    } catch {
       setError("Error fetching trolley problems.");
       setBatch([]);
       setCurrentIndex(0);
@@ -194,7 +199,7 @@ No extra commentary.
   if (loading) {
     return (
       <div className="flex justify-center items-center text-3xl">
-        <div>Generating trolley problems...</div>
+        <div>Generating more trolley problems...</div>
       </div>
     );
   }

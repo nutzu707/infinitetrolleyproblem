@@ -137,7 +137,7 @@ function getRandomAdjectives(count: number) {
 }
 
 // Typing animation hook
-function useTypewriter(text: string, speed: number, deps: any[] = []) {
+function useTypewriter(text: string, speed: number, deps: unknown[] = []) {
   const [displayed, setDisplayed] = useState('');
   useEffect(() => {
     setDisplayed('');
